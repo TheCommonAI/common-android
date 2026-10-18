@@ -10,14 +10,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,7 +119,7 @@ private fun CommonChat(
     var streaming by remember { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     val messages = rememberSaveable(
-        saver = listSaver(
+        saver = listSaver<SnapshotStateList<TranscriptMessage>, String>(
             save = { current ->
                 current.map { message ->
                     JSONObject()
@@ -145,7 +146,7 @@ private fun CommonChat(
                 }
             },
         ),
-    ) { mutableStateListOf() }
+    ) { mutableStateListOf<TranscriptMessage>() }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
@@ -200,7 +201,8 @@ private fun CommonChat(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .imePadding(),
         ) {
             Row(
