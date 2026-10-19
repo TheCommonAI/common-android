@@ -33,7 +33,7 @@ android {
 
 dependencies {
     implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation(project(":shared"))
 
     implementation(compose.runtime)
