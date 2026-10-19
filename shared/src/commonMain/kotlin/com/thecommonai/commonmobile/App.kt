@@ -1,8 +1,5 @@
-package com.thecommonai.commonandroid
+package com.thecommonai.commonmobile
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -64,7 +61,12 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 
 private val Ground = Color(0xFF292928)
 private val Ink = Color(0xFFF6F6F6)
@@ -80,29 +82,23 @@ data class TranscriptMessage(
     val routeMs: Long? = null,
 )
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val preferences = getSharedPreferences("common", MODE_PRIVATE)
-        setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    background = Ground,
-                    surface = Ground,
-                    primary = Blue,
-                    onPrimary = Ground,
-                    onBackground = Ink,
-                    onSurface = Ink,
-                    error = Red,
-                ),
-            ) {
-                CommonChat(
-                    initialGateway = preferences.getString("gateway", NetworkClient.DEFAULT_GATEWAY)
-                        ?: NetworkClient.DEFAULT_GATEWAY,
-                    onGatewaySaved = { preferences.edit().putString("gateway", it).apply() },
-                )
-            }
-        }
+@Composable
+fun CommonApp(
+    initialGateway: String,
+    onGatewaySaved: (String) -> Unit,
+) {
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            background = Ground,
+            surface = Ground,
+            primary = Blue,
+            onPrimary = Ground,
+            onBackground = Ink,
+            onSurface = Ink,
+            error = Red,
+        ),
+    ) {
+        CommonChat(initialGateway, onGatewaySaved)
     }
 }
 
@@ -122,24 +118,25 @@ private fun CommonChat(
         saver = listSaver<SnapshotStateList<TranscriptMessage>, String>(
             save = { current ->
                 current.map { message ->
-                    JSONObject()
-                        .put("role", message.role)
-                        .put("text", message.text)
-                        .put("servedBy", message.servedBy)
-                        .put("routeMs", message.routeMs)
-                        .toString()
+                    buildJsonObject {
+                        put("role", message.role)
+                        put("text", message.text)
+                        message.servedBy?.let { put("servedBy", it) }
+                        message.routeMs?.let { put("routeMs", it) }
+                    }.toString()
                 }
             },
             restore = { saved ->
                 mutableStateListOf<TranscriptMessage>().apply {
                     saved.forEach { json ->
-                        val message = JSONObject(json)
+                        val message = Json.parseToJsonElement(json).jsonObject
                         add(
                             TranscriptMessage(
-                                role = message.getString("role"),
-                                text = message.getString("text"),
-                                servedBy = message.optString("servedBy").takeIf { it.isNotEmpty() },
-                                routeMs = message.optLong("routeMs").takeIf { message.has("routeMs") },
+                                role = message.getValue("role").jsonPrimitive.content,
+                                text = message.getValue("text").jsonPrimitive.content,
+                                servedBy = message["servedBy"]?.jsonPrimitive?.content
+                                    ?.takeIf(String::isNotEmpty),
+                                routeMs = message["routeMs"]?.jsonPrimitive?.longOrNull,
                             ),
                         )
                     }

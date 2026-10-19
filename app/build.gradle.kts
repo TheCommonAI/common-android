@@ -1,11 +1,12 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
-    namespace = "com.thecommonai.commonandroid"
+    namespace = "com.thecommonai.commonmobile"
     compileSdk = 35
 
     defaultConfig {
@@ -31,19 +32,9 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
-    implementation(composeBom)
-    androidTestImplementation(composeBom)
-
     implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+    implementation(project(":shared"))
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
-
-    testImplementation("junit:junit:4.13.2")
+    implementation(compose.runtime)
 }
