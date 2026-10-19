@@ -22,7 +22,7 @@
 			isa = PBXFileReference;
 			lastKnownFileType = wrapper.framework;
 			name = Shared.framework;
-			path = ../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)/Shared.framework;
+			path = "../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)/Shared.framework";
 			sourceTree = SOURCE_ROOT;
 		};
 		200000000000000000000003 /* iosApp.app */ = {
