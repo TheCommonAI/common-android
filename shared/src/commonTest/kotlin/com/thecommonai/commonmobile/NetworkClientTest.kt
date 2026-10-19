@@ -1,8 +1,8 @@
-package com.thecommonai.commonandroid
+package com.thecommonai.commonmobile
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class NetworkClientTest {
     @Test
@@ -23,18 +23,24 @@ class NetworkClientTest {
 
     @Test
     fun rejectsRemoteHttpGateway() {
-        assertThrows(IllegalArgumentException::class.java) {
+        assertFailsWith<IllegalArgumentException> {
             NetworkClient.validateGateway("http://gateway.example")
         }
     }
 
     @Test
     fun rejectsGatewayCredentialsAndQueryParameters() {
-        assertThrows(IllegalArgumentException::class.java) {
-            NetworkClient.validateGateway("https://user:secret@gateway.example")
+        assertFailsWith<IllegalArgumentException> {
+            NetworkClient.validateGateway("https://user:password@gateway.example")
         }
-        assertThrows(IllegalArgumentException::class.java) {
+        assertFailsWith<IllegalArgumentException> {
             NetworkClient.validateGateway("https://gateway.example?token=secret")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkClient.validateGateway("https://gateway.example?")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            NetworkClient.validateGateway("https://gateway.example#")
         }
     }
 }

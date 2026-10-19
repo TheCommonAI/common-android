@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Common"
-include(":app")
+rootProject.name = "Common Mobile"
+include(":app", ":shared")
