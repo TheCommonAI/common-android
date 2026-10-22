@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -18,11 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +90,7 @@ data class TranscriptMessage(
 fun CommonApp(
     initialGateway: String,
     onGatewaySaved: (String) -> Unit,
+    contributorController: ContributorController? = null,
 ) {
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -98,7 +103,7 @@ fun CommonApp(
             error = Red,
         ),
     ) {
-        CommonChat(initialGateway, onGatewaySaved)
+        CommonChat(initialGateway, onGatewaySaved, contributorController)
     }
 }
 
@@ -106,6 +111,7 @@ fun CommonApp(
 private fun CommonChat(
     initialGateway: String,
     onGatewaySaved: (String) -> Unit,
+    contributorController: ContributorController?,
 ) {
     var gateway by rememberSaveable { mutableStateOf(initialGateway) }
     var nodeToken by remember { mutableStateOf("") }
@@ -368,6 +374,7 @@ private fun CommonChat(
         SettingsDialog(
             gateway = gateway,
             token = nodeToken,
+            contributorController = contributorController,
             onDismiss = { showSettings = false },
             onSave = { newGateway, newToken ->
                 gateway = newGateway
@@ -437,19 +444,30 @@ private fun MessageItem(message: TranscriptMessage) {
 private fun SettingsDialog(
     gateway: String,
     token: String,
+    contributorController: ContributorController?,
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
 ) {
     var gatewayDraft by remember(gateway) { mutableStateOf(gateway) }
     var tokenDraft by remember(token) { mutableStateOf(token) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    var candidate by remember { mutableStateOf<ContributorCandidate?>(null) }
+    var contributorBusy by remember { mutableStateOf(false) }
+    var contributorError by remember { mutableStateOf<String?>(null) }
+    val contributorStatus = contributorController?.status?.collectAsState()
+    val scope = rememberCoroutineScope()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Raised,
         title = { Text("Network", color = Ink, fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Text("Gateway URL", color = Quiet, fontSize = 12.sp)
                 SettingsField(
                     value = gatewayDraft,
@@ -464,14 +482,104 @@ private fun SettingsDialog(
                     visualTransformation = PasswordVisualTransformation(),
                 )
                 Text(
-                    "The token is kept in memory only and sent to this gateway. " +
-                        "This app never registers a node or donates a model.",
+                "An existing chat token is kept in memory and sent to this gateway. Contributor credentials " +
+                    "are stored separately using Android Keystore.",
                     color = Quiet,
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                 )
                 validationError?.let {
                     Text(it, color = Color(0xFFFFB7A8), fontSize = 12.sp)
+                }
+                Text("Contribute this Android device", color = Ink, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "This downloads and runs a local model and uses device resources. Contribution is available " +
+                        "only while Common Mobile remains active; Android may suspend the app.",
+                    color = Quiet,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                )
+                if (contributorController == null) {
+                    Text("Local contribution is available only in the Android app.", color = Quiet, fontSize = 12.sp)
+                } else {
+                    contributorStatus?.value?.let { status ->
+                        Text(status.message, color = if (status.connected) Blue else Quiet, fontSize = 12.sp)
+                    }
+                    candidate?.let { selected ->
+                        Text(
+                            "${selected.displayName} · ${selected.modelFormat}\n" +
+                                "Runtime requirements: ${selected.runtimeRequirements.joinToString()}\n" +
+                                (selected.runtimeNotes?.let { "$it\n" } ?: "") +
+                                selected.reason,
+                            color = Ink,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
+                    contributorError?.let {
+                        Text(it, color = Color(0xFFFFB7A8), fontSize = 12.sp)
+                    }
+                    val status = contributorStatus?.value
+                    when {
+                        status?.enrolled == true -> TextButton(
+                            enabled = !contributorBusy,
+                            onClick = {
+                                contributorBusy = true
+                                contributorError = null
+                                scope.launch {
+                                    try {
+                                        contributorController.stop()
+                                        candidate = null
+                                    } catch (failure: Exception) {
+                                        contributorError = failure.message ?: "Could not stop contribution."
+                                    } finally {
+                                        contributorBusy = false
+                                    }
+                                }
+                            },
+                        ) { Text("Stop contributing", color = Color(0xFFFFB7A8)) }
+                        candidate == null -> TextButton(
+                            enabled = !contributorBusy,
+                            onClick = {
+                                contributorBusy = true
+                                contributorError = null
+                                scope.launch {
+                                    try {
+                                        candidate = contributorController.checkCompatibility(
+                                            NetworkClient.validateGateway(gatewayDraft),
+                                        )
+                                    } catch (failure: Exception) {
+                                        contributorError = failure.message ?: "Could not check model compatibility."
+                                    } finally {
+                                        contributorBusy = false
+                                    }
+                                }
+                            },
+                        ) { Text(if (contributorBusy) "Checking…" else "Check compatible model", color = Blue) }
+                        else -> TextButton(
+                            enabled = !contributorBusy,
+                            onClick = {
+                                contributorBusy = true
+                                contributorError = null
+                                val selected = candidate
+                                scope.launch {
+                                    try {
+                                        if (selected == null) {
+                                            throw IllegalStateException("Check model compatibility again before starting.")
+                                        }
+                                        contributorController.start(
+                                            NetworkClient.validateGateway(gatewayDraft),
+                                            selected,
+                                        )
+                                    } catch (failure: Exception) {
+                                        contributorError = failure.message ?: "Could not start contribution."
+                                    } finally {
+                                        contributorBusy = false
+                                    }
+                                }
+                            },
+                        ) { Text(if (contributorBusy) "Preparing model…" else "Start contribution", color = Blue) }
+                    }
                 }
             }
         },
